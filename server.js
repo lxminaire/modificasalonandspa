@@ -908,6 +908,64 @@ app.get("/", (req, res) => {
 
 /*
 |--------------------------------------------------------------------------
+| PRIVACY POLICY
+|--------------------------------------------------------------------------
+*/
+
+app.get("/privacy-policy", (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Privacy Policy — Modifica Salon and Spa Messenger Bot</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #222;">
+            <h1>Privacy Policy</h1>
+            <p><em>Last updated: August 2026</em></p>
+
+            <p>This Privacy Policy explains how Modifica Salon and Spa ("we", "us", "our") collects, uses, and protects information when you interact with our Messenger bot ("the Bot") on Facebook Messenger.</p>
+
+            <h2>Information We Collect</h2>
+            <ul>
+                <li>Your Facebook Page-Scoped ID (PSID), a unique identifier used to send you messages through Messenger.</li>
+                <li>The content of messages you send to the Bot, including selections from menus and quick replies.</li>
+                <li>If you use the Rewards feature, the email address or phone number you provide to look up your loyalty account.</li>
+            </ul>
+
+            <h2>How We Use Your Information</h2>
+            <ul>
+                <li>To respond to your messages and provide information about our services, promotions, and locations.</li>
+                <li>To look up your loyalty rewards account and display your points balance, using our Wix Loyalty and Contacts records.</li>
+                <li>To allow our staff to take over a conversation from the Bot when needed to assist you directly.</li>
+            </ul>
+
+            <h2>Data Sharing</h2>
+            <p>We do not sell or share your information with third parties for marketing purposes. Information you provide is shared only with:</p>
+            <ul>
+                <li>Meta (Facebook), as the platform through which Messenger operates.</li>
+                <li>Wix, our website and business management platform, to verify and retrieve your loyalty rewards account.</li>
+            </ul>
+
+            <h2>Data Retention</h2>
+            <p>Certain identifiers (such as your PSID and linked rewards account) are retained to provide a continuous experience, such as remembering your rewards account for future visits. You may disconnect your linked rewards account at any time using the "Disconnect" option in the Bot.</p>
+
+            <h2>Your Choices</h2>
+            <p>You may stop interacting with the Bot at any time by blocking or unsubscribing from our Facebook Page. You can request removal of your data by contacting us using the details below.</p>
+
+            <h2>Contact Us</h2>
+            <p>If you have questions about this Privacy Policy or your data, please contact us at:</p>
+            <p>📞 +63 915 627 3312<br>
+            🌐 <a href="https://www.modificasalonandspa.com">modificasalonandspa.com</a></p>
+        </body>
+        </html>
+    `);
+});
+
+
+/*
+|--------------------------------------------------------------------------
 | WEBHOOK VERIFICATION
 |--------------------------------------------------------------------------
 */
