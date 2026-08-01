@@ -119,7 +119,7 @@ function isKnownBotText(text){
 |--------------------------------------------------------------------------
 | If a human agent sends a message from the Page that isn't one of the
 | bot's known texts, the bot goes silent for that specific customer for
-| 30 minutes. Every new human message resets the 30-minute timer, so
+| 30 minutes. Every new human message resets the 3-minute timer, so
 | the bot stays asleep as long as the agent keeps replying.
 |
 | NOTE: In-memory only — resets on server restart. Also only detects
@@ -127,14 +127,14 @@ function isKnownBotText(text){
 | only an image (no text) won't be detected as a takeover.
 */
 
-const HUMAN_HIBERNATION_MS = 30 * 60 * 1000; // 30 minutes
+const HUMAN_HIBERNATION_MS = 3 * 60 * 1000; // 3 minutes
 
 const humanTakeoverState = new Map();
 // customerId (PSID) -> lastHumanMessageAt timestamp
 
 function registerHumanMessage(customerId){
     humanTakeoverState.set(customerId, Date.now());
-    console.log("🧑‍💼 Human agent message detected for", customerId, "— bot hibernating for 30 minutes");
+    console.log("🧑‍💼 Human agent message detected for", customerId, "— bot hibernating for 3 minutes");
 }
 
 function isHibernating(customerId){
