@@ -119,8 +119,8 @@ function isKnownBotText(text){
 |--------------------------------------------------------------------------
 | If a human agent sends a message from the Page that isn't one of the
 | bot's known texts, the bot goes silent for that specific customer for
-| 30 minutes. Every new human message resets the 3-minute timer, so
-| the bot stays asleep as long as the agent keeps replying.
+| 3 minutes. Every new human message resets the timer, so the bot stays
+| asleep as long as the agent keeps replying.
 |
 | NOTE: In-memory only — resets on server restart. Also only detects
 | takeover on messages that contain text; a human agent replying with
@@ -148,54 +148,52 @@ function isHibernating(customerId){
 |--------------------------------------------------------------------------
 | FALLBACK MESSAGE RATE LIMITING
 |--------------------------------------------------------------------------
-| Tracks, per user, how many consecutive unrecognized messages they've
-| sent, and when they last received the "I don't understand" fallback.
+| Tracks, per user, when they last received the "I don't understand"
+| fallback message.
 |
 | Rules:
-| - The fallback message (with contact number) only sends on every
-|   3rd unrecognized message. The 1st and 2nd get no reply at all.
-| - If 12+ hours have passed since the last fallback was sent to that
-|   user, the 3-message requirement resets — the very next unrecognized
-|   message triggers the fallback immediately.
+| - The fallback sends immediately on the FIRST unrecognized message.
+| - After that, it stays silent on further unrecognized messages until
+|   either: (a) the reset window has passed since the last fallback was
+|   sent, or (b) the user sends a recognized message (handled in the
+|   webhook via resetFallbackState), which re-arms it to fire again on
+|   their very next unrecognized message.
 |
 | NOTE: In-memory only — resets on server restart.
 */
 
-const FALLBACK_THRESHOLD = 3;
-const FALLBACK_RESET_WINDOW_MS = 12 * 60 * 60 * 1000; // 12 hours
+const FALLBACK_RESET_WINDOW_MS = 1 * 60 * 60 * 1000; // 1 hour
 
 const userFallbackState = new Map();
-// senderId -> { count: number, lastFallbackSentAt: number|null }
+// senderId -> { lastFallbackSentAt: number|null }
 
 function shouldSendFallback(senderId){
 
-    const state = userFallbackState.get(senderId) || { count: 0, lastFallbackSentAt: null };
-
-    state.count += 1;
+    const state = userFallbackState.get(senderId) || { lastFallbackSentAt: null };
 
     const now = Date.now();
+
+    const neverSent = state.lastFallbackSentAt === null;
 
     const resetWindowPassed =
         state.lastFallbackSentAt !== null &&
         (now - state.lastFallbackSentAt) > FALLBACK_RESET_WINDOW_MS;
 
-    let shouldSend = false;
-
-    if(resetWindowPassed){
-        shouldSend = true;
-    }
-    else if(state.count >= FALLBACK_THRESHOLD){
-        shouldSend = true;
-    }
+    const shouldSend = neverSent || resetWindowPassed;
 
     if(shouldSend){
-        state.count = 0;
         state.lastFallbackSentAt = now;
+        userFallbackState.set(senderId, state);
     }
 
-    userFallbackState.set(senderId, state);
-
     return shouldSend;
+}
+
+// Called whenever a user sends a RECOGNIZED message, so the next time
+// they send something unrecognized, the fallback fires immediately
+// again instead of waiting out the reset window.
+function resetFallbackState(senderId){
+    userFallbackState.delete(senderId);
 }
 
 
@@ -1081,6 +1079,12 @@ app.post("/webhook", (req, res) => {
 
                     const reply = handleMessage(messageText);
 
+                    // A recognized message re-arms the fallback so the
+                    // NEXT unrecognized message fires immediately again.
+                    if(reply.type !== "unrecognized"){
+                        resetFallbackState(senderId);
+                    }
+
                     if(reply.type === "menu"){
                         await sendQuickReplies(senderId, reply.text, reply.replies);
                     }
@@ -1100,7 +1104,8 @@ app.post("/webhook", (req, res) => {
                         if(shouldSendFallback(senderId)){
                             await sendText(senderId, reply.text);
                         }
-                        // else: stay silent, this wasn't the 3rd unrecognized message yet
+                        // else: stay silent, already replied to the first
+                        // unrecognized message in this streak
                     }
                 }
 
