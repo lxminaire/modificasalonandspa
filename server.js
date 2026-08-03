@@ -32,9 +32,9 @@ const SERVICE_IMAGES = {
     QUEZON: {
         HAIR_MAKEUP: "https://user19535.na.imgto.link/public/20260731/price-hairmakeup.avif",
         // NOTE: no FACIAL key here on purpose — ML Quezon doesn't offer this
-        MASSAGE: "https://user19535.na.imgto.link/public/20260731/price-massage.avif",
+        MASSAGE:  "https://user19535.na.imgto.link/public/20260731/price-massage.avif",
         MAKEUP: "https://user19535.na.imgto.link/public/20260731/price-eyelash.avif",
-        NAILS: "https://user19535.na.imgto.link/public/20260731/price-nails.avif"
+        NAILS:"https://user19535.na.imgto.link/public/20260731/price-nails.avif"
     }
 };
 
@@ -712,20 +712,33 @@ async function sendQuickReplies(senderId, text, replies){
 |--------------------------------------------------------------------------
 | SEND BRANCH SELECTION MENU
 |--------------------------------------------------------------------------
-| Asks the customer which branch's pricelist they want to see. Their
-| choice comes back as a BRANCH_<key> payload (e.g. BRANCH_LAWIS),
-| which then drives sendServiceCategories() for that branch.
+| Asks the customer which branch's pricelist they want to see, as CTA
+| buttons (button template) rather than quick replies. Their choice
+| comes back as a postback with a BRANCH_<key> payload (e.g.
+| BRANCH_LAWIS), which then drives sendServiceCategories() for that
+| branch. NOTE: Messenger button templates support a max of 3 buttons —
+| fine for now with 2 branches, but keep that ceiling in mind if a
+| third branch is ever added.
 */
 
 async function sendBranchMenu(senderId){
-    return sendQuickReplies(
-        senderId,
-        TEXTS.BRANCH_PROMPT,
-        BRANCHES.map(branch => ({
-            title: branch.title,
-            payload: `BRANCH_${branch.key}`
-        }))
-    );
+    return callMessengerAPI({
+        recipient:{ id:senderId },
+        message:{
+            attachment:{
+                type:"template",
+                payload:{
+                    template_type:"button",
+                    text: TEXTS.BRANCH_PROMPT,
+                    buttons: BRANCHES.map(branch => ({
+                        type:"postback",
+                        title: branch.title,
+                        payload: `BRANCH_${branch.key}`
+                    }))
+                }
+            }
+        }
+    });
 }
 
 
