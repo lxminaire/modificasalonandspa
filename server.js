@@ -661,6 +661,7 @@ function handleMessage(messageText){
         text.includes("eyebrow") ||
         text.includes("brows") ||
         text.includes("balayage") ||
+        text.includes("avail") ||
         text.includes("waxing")
     ){
         return { type:"services" };
