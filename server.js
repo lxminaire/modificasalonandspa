@@ -16,9 +16,6 @@ const PORT = process.env.PORT || 3000;
 | Nested by branch, then category. ML Quezon has no FACIAL key on
 | purpose — that branch doesn't offer Facial & Slimming, so the
 | category is automatically hidden from its pricelist menu.
-|
-| TODO: Replace the ML Quezon placeholder URLs below with the real
-| pricelist image links for that branch.
 */
 
 const SERVICE_IMAGES = {
@@ -55,6 +52,44 @@ const BRANCHES = [
     { key:"LAWIS", title:"📍 C. Lawis Ext." },
     { key:"QUEZON", title:"📍 ML Quezon" }
 ];
+
+
+/*
+|--------------------------------------------------------------------------
+| CONNECTED FACEBOOK PAGES
+|--------------------------------------------------------------------------
+| This bot can reply on more than one Facebook Page (e.g. a separate
+| Page per branch) as long as each Page's ID + Page Access Token is
+| listed here. Every incoming webhook event tells us which Page ID
+| received it (entry.id) — getPageAccessToken() maps that back to the
+| right token so replies go out from the correct Page's identity.
+|
+| Required .env vars per page:
+|   PAGE_ID_LAWIS / PAGE_ACCESS_TOKEN_LAWIS
+|   PAGE_ID_QUEZON / PAGE_ACCESS_TOKEN_QUEZON
+|
+| A Page listed here with no ID/token set (e.g. not connected yet) is
+| simply skipped — this lets you add PAGE_ID_QUEZON/PAGE_ACCESS_TOKEN_QUEZON
+| whenever that Page is ready, without breaking the Lawis-only setup
+| in the meantime.
+*/
+
+const PAGES = [
+    { key:"LAWIS", pageId: process.env.PAGE_ID_LAWIS, accessToken: process.env.PAGE_ACCESS_TOKEN_LAWIS },
+    { key:"QUEZON", pageId: process.env.PAGE_ID_QUEZON, accessToken: process.env.PAGE_ACCESS_TOKEN_QUEZON }
+].filter(page => page.pageId && page.accessToken);
+
+if(PAGES.length === 0){
+    console.warn("⚠️ No pages configured! Set PAGE_ID_LAWIS/PAGE_ACCESS_TOKEN_LAWIS (and/or the QUEZON pair) in .env");
+}
+
+// Given the Facebook Page ID that received a webhook event, returns
+// that Page's own access token so replies are sent from the right
+// Page. Returns null if the Page ID isn't configured above.
+function getPageAccessToken(pageId){
+    const page = PAGES.find(p => p.pageId === pageId);
+    return page ? page.accessToken : null;
+}
 
 
 /*
@@ -455,7 +490,7 @@ async function lookupWixLoyaltyAccount(identifier){
 // Sends the rewards points message with a "Disconnect" quick reply
 // attached, so a customer who linked the wrong email/number can undo it
 // and re-enter their identifier.
-async function sendRewardsPointsMessage(senderId, points){
+async function sendRewardsPointsMessage(senderId, points, pageId){
     return callMessengerAPI({
         recipient:{ id:senderId },
         message:{
@@ -468,17 +503,17 @@ async function sendRewardsPointsMessage(senderId, points){
                 }
             ]
         }
-    });
+    }, getPageAccessToken(pageId));
 }
 
 // Kicks off the rewards flow: if this Messenger user is already a
 // verified customer, show their points immediately. Otherwise asks
 // for their email or phone number. Falls back to the static "coming
 // soon" message if Wix credentials aren't set up yet.
-async function startRewardsFlow(senderId){
+async function startRewardsFlow(senderId, pageId){
     if(!process.env.WIX_API_KEY || !process.env.WIX_SITE_ID){
         console.log("⚠️ WIX_API_KEY / WIX_SITE_ID not set — falling back to static rewards message");
-        await sendText(senderId, TEXTS.REWARDS);
+        await sendText(senderId, TEXTS.REWARDS, pageId);
         return;
     }
 
@@ -489,31 +524,31 @@ async function startRewardsFlow(senderId){
             const points = await getWixLoyaltyPointsByContactId(verified.contactId);
 
             if(points === null){
-                await sendText(senderId, TEXTS.REWARDS_NOT_FOUND);
+                await sendText(senderId, TEXTS.REWARDS_NOT_FOUND, pageId);
             }
             else{
-                await sendRewardsPointsMessage(senderId, points);
+                await sendRewardsPointsMessage(senderId, points, pageId);
             }
         }
         catch(error){
             console.error("❌ Wix Loyalty Error:", error);
-            await sendText(senderId, TEXTS.REWARDS_ERROR);
+            await sendText(senderId, TEXTS.REWARDS_ERROR, pageId);
         }
         return;
     }
 
     setAwaitingRewardsIdentifier(senderId);
-    await sendText(senderId, TEXTS.REWARDS_ASK_IDENTIFIER);
+    await sendText(senderId, TEXTS.REWARDS_ASK_IDENTIFIER, pageId);
 }
 
 // Handles the customer's reply once we're waiting on their email/phone.
-async function handleRewardsIdentifierReply(senderId, messageText){
+async function handleRewardsIdentifierReply(senderId, messageText, pageId){
 
     const trimmed = messageText.trim();
 
     if(trimmed.toLowerCase() === "cancel"){
         clearAwaitingRewardsIdentifier(senderId);
-        await sendText(senderId, TEXTS.REWARDS_CANCELLED);
+        await sendText(senderId, TEXTS.REWARDS_CANCELLED, pageId);
         return;
     }
 
@@ -521,7 +556,7 @@ async function handleRewardsIdentifierReply(senderId, messageText){
     const isPhone = PHONE_PATTERN.test(trimmed);
 
     if(!isEmail && !isPhone){
-        await sendText(senderId, TEXTS.REWARDS_INVALID_IDENTIFIER);
+        await sendText(senderId, TEXTS.REWARDS_INVALID_IDENTIFIER, pageId);
         return; // stay in the awaiting-identifier state, let them try again
     }
 
@@ -531,7 +566,7 @@ async function handleRewardsIdentifierReply(senderId, messageText){
         const result = await lookupWixLoyaltyAccount(trimmed);
 
         if(!result){
-            await sendText(senderId, TEXTS.REWARDS_NOT_FOUND);
+            await sendText(senderId, TEXTS.REWARDS_NOT_FOUND, pageId);
             return;
         }
 
@@ -539,23 +574,23 @@ async function handleRewardsIdentifierReply(senderId, messageText){
         // taps skip straight to their balance.
         setVerifiedRewardsCustomer(senderId, result.contactId, trimmed);
 
-        await sendRewardsPointsMessage(senderId, result.points);
+        await sendRewardsPointsMessage(senderId, result.points, pageId);
     }
     catch(error){
         console.error("❌ Wix Rewards Lookup Error:", error);
-        await sendText(senderId, TEXTS.REWARDS_ERROR);
+        await sendText(senderId, TEXTS.REWARDS_ERROR, pageId);
     }
 }
 
 // Handles the "Disconnect" quick reply on the rewards points message:
 // forgets the verified customer and immediately re-prompts for their
 // email/phone number so they can re-link with the correct one.
-async function disconnectRewardsCustomer(senderId){
+async function disconnectRewardsCustomer(senderId, pageId){
     clearVerifiedRewardsCustomer(senderId);
     clearAwaitingRewardsIdentifier(senderId); // just in case, reset any stale wait state
 
-    await sendText(senderId, TEXTS.REWARDS_DISCONNECTED);
-    await startRewardsFlow(senderId); // no longer verified, so this asks for the identifier again
+    await sendText(senderId, TEXTS.REWARDS_DISCONNECTED, pageId);
+    await startRewardsFlow(senderId, pageId); // no longer verified, so this asks for the identifier again
 }
 
 
@@ -649,10 +684,16 @@ function handleMessage(messageText){
 |--------------------------------------------------------------------------
 */
 
-async function callMessengerAPI(body){
+async function callMessengerAPI(body, pageAccessToken){
+
+    if(!pageAccessToken){
+        console.error("❌ Messenger Error: no page access token available for this send — is the Page configured in PAGES?");
+        return;
+    }
+
     try{
         const response = await fetch(
-            `https://graph.facebook.com/v21.0/me/messages?access_token=${process.env.PAGE_ACCESS_TOKEN}`,
+            `https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`,
             {
                 method:"POST",
                 headers:{ "Content-Type":"application/json" },
@@ -679,11 +720,11 @@ async function callMessengerAPI(body){
 |--------------------------------------------------------------------------
 */
 
-async function sendText(senderId, text){
+async function sendText(senderId, text, pageId){
     return callMessengerAPI({
         recipient:{ id:senderId },
         message:{ text:text }
-    });
+    }, getPageAccessToken(pageId));
 }
 
 
@@ -693,7 +734,7 @@ async function sendText(senderId, text){
 |--------------------------------------------------------------------------
 */
 
-async function sendQuickReplies(senderId, text, replies){
+async function sendQuickReplies(senderId, text, replies, pageId){
     return callMessengerAPI({
         recipient:{ id:senderId },
         message:{
@@ -704,7 +745,7 @@ async function sendQuickReplies(senderId, text, replies){
                 payload:reply.payload
             }))
         }
-    });
+    }, getPageAccessToken(pageId));
 }
 
 
@@ -721,7 +762,7 @@ async function sendQuickReplies(senderId, text, replies){
 | third branch is ever added.
 */
 
-async function sendBranchMenu(senderId){
+async function sendBranchMenu(senderId, pageId){
     return callMessengerAPI({
         recipient:{ id:senderId },
         message:{
@@ -738,7 +779,7 @@ async function sendBranchMenu(senderId){
                 }
             }
         }
-    });
+    }, getPageAccessToken(pageId));
 }
 
 
@@ -755,7 +796,7 @@ async function sendBranchMenu(senderId){
 | sequence keeps it visible.
 */
 
-async function sendServiceImage(senderId, branch, category){
+async function sendServiceImage(senderId, branch, category, pageId){
 
     await callMessengerAPI({
         recipient:{ id:senderId },
@@ -768,7 +809,7 @@ async function sendServiceImage(senderId, branch, category){
                 }
             }
         }
-    });
+    }, getPageAccessToken(pageId));
 
     return sendBookingButton(senderId, [
         {
@@ -776,7 +817,7 @@ async function sendServiceImage(senderId, branch, category){
             title:"🏷️ Check our Promotions",
             payload:"PROMOTIONS"
         }
-    ]);
+    ], pageId);
 }
 
 
@@ -790,14 +831,15 @@ async function sendServiceImage(senderId, branch, category){
 | each routing to their own existing flow.
 */
 
-async function sendServicesPromosMenu(senderId){
+async function sendServicesPromosMenu(senderId, pageId){
     return sendQuickReplies(
         senderId,
         TEXTS.SERVICES_PROMOS_PROMPT,
         [
             { title:"🏷️ Our Pricelist", payload:"OUR_PRICELIST" },
             { title:"🎉 Current Promotions", payload:"PROMOTIONS" }
-        ]
+        ],
+        pageId
     );
 }
 
@@ -815,7 +857,7 @@ async function sendServicesPromosMenu(senderId){
 | stored state to know which branch's image to send.
 */
 
-async function sendServiceCategories(senderId, branch){
+async function sendServiceCategories(senderId, branch, pageId){
 
     const availableCategories = SERVICE_CATEGORIES.filter(
         category => SERVICE_IMAGES[branch] && SERVICE_IMAGES[branch][category.key]
@@ -827,7 +869,8 @@ async function sendServiceCategories(senderId, branch){
         availableCategories.map(category => ({
             title: category.title,
             payload: `${category.key}__${branch}`
-        }))
+        })),
+        pageId
     );
 }
 
@@ -840,7 +883,10 @@ async function sendServiceCategories(senderId, branch){
 | message that combines the text + booking button together.
 */
 
-async function sendPromotions(senderId){
+async function sendPromotions(senderId, pageId){
+
+    const pageAccessToken = getPageAccessToken(pageId);
+
     for(const url of PROMO_IMAGES){
         await callMessengerAPI({
             recipient:{ id:senderId },
@@ -853,7 +899,7 @@ async function sendPromotions(senderId){
                     }
                 }
             }
-        });
+        }, pageAccessToken);
     }
 
     // Single closing message: text + booking button together
@@ -875,7 +921,7 @@ async function sendPromotions(senderId){
                 }
             }
         }
-    });
+    }, pageAccessToken);
 }
 
 
@@ -889,7 +935,7 @@ async function sendPromotions(senderId){
 | being wiped out by a message sent right after it.
 */
 
-async function sendBookingButton(senderId, quickReplies){
+async function sendBookingButton(senderId, quickReplies, pageId){
 
     const message = {
         attachment:{
@@ -915,7 +961,7 @@ async function sendBookingButton(senderId, quickReplies){
     return callMessengerAPI({
         recipient:{ id:senderId },
         message
-    });
+    }, getPageAccessToken(pageId));
 }
 
 
@@ -926,49 +972,58 @@ async function sendBookingButton(senderId, quickReplies){
 | Configures the pre-chat greeting screen, the "Get Started" button new
 | customers see on their very first visit (tapping it fires a postback
 | with payload GET_STARTED — handled in handlePayload), and the
-| persistent menu.
+| persistent menu. Loops over every connected Page in PAGES so both
+| branches get the same greeting/menu setup.
 */
 
 async function setMessengerProfile(){
-    try{
-        const response = await fetch(
-            `https://graph.facebook.com/v21.0/me/messenger_profile?access_token=${process.env.PAGE_ACCESS_TOKEN}`,
-            {
-                method:"POST",
-                headers:{ "Content-Type":"application/json" },
-                body:JSON.stringify({
-                    greeting:[
-                        {
-                            locale:"default",
-                            text:"Welcome to Modifica Salon and Spa! 💇‍♀️ Tap Get Started to see our services, book an appointment, and more."
-                        }
-                    ],
-                    get_started:{
-                        payload:"GET_STARTED"
-                    },
-                    persistent_menu:[
-                        {
-                            locale:"default",
-                            composer_input_disabled:false,
-                            call_to_actions:[
-                                { type:"postback", title:"💅 Services & Promos", payload:"SERVICES" },
-                                { type:"web_url", title:"📅 Book Appointment", url:"https://www.modificasalonandspa.com/booknow" },
-                                { type:"postback", title:"⭐ My Rewards", payload:"REWARDS" },
-                                { type:"postback", title:"📍 Locations", payload:"LOCATIONS" }
-                            ]
-                        }
-                    ]
-                })
-            }
-        );
 
-        const data = await response.json();
-
-        console.log("📌 Messenger Profile Updated:");
-        console.log(data);
+    if(PAGES.length === 0){
+        console.warn("⚠️ Skipping Messenger profile setup — no pages configured");
+        return;
     }
-    catch(error){
-        console.error("❌ Messenger Profile Error:", error);
+
+    for(const page of PAGES){
+        try{
+            const response = await fetch(
+                `https://graph.facebook.com/v21.0/me/messenger_profile?access_token=${page.accessToken}`,
+                {
+                    method:"POST",
+                    headers:{ "Content-Type":"application/json" },
+                    body:JSON.stringify({
+                        greeting:[
+                            {
+                                locale:"default",
+                                text:"Welcome to Modifica Salon and Spa! 💇‍♀️ Tap Get Started to see our services, book an appointment, and more."
+                            }
+                        ],
+                        get_started:{
+                            payload:"GET_STARTED"
+                        },
+                        persistent_menu:[
+                            {
+                                locale:"default",
+                                composer_input_disabled:false,
+                                call_to_actions:[
+                                    { type:"postback", title:"💅 Services & Promos", payload:"SERVICES" },
+                                    { type:"web_url", title:"📅 Book Appointment", url:"https://www.modificasalonandspa.com/booknow" },
+                                    { type:"postback", title:"⭐ My Rewards", payload:"REWARDS" },
+                                    { type:"postback", title:"📍 Locations", payload:"LOCATIONS" }
+                                ]
+                            }
+                        ]
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            console.log(`📌 Messenger Profile Updated for ${page.key}:`);
+            console.log(data);
+        }
+        catch(error){
+            console.error(`❌ Messenger Profile Error for ${page.key}:`, error);
+        }
     }
 }
 
@@ -1096,9 +1151,14 @@ app.post("/webhook", (req, res) => {
 
             if(!entry.messaging) continue;
 
+            // The Facebook Page ID that actually received this event —
+            // used to look up which Page's access token to reply with,
+            // since multiple Pages can share this one webhook.
+            const pageId = entry.id;
+
             for(const event of entry.messaging){
 
-                console.log("📨 EVENT RECEIVED");
+                console.log("📨 EVENT RECEIVED for page", pageId);
 
                 // ECHO HANDLER — detect human agent takeover
                 if(event.message && event.message.is_echo){
@@ -1139,7 +1199,7 @@ app.post("/webhook", (req, res) => {
 
                     console.log("🔘 QUICK REPLY:", payload);
 
-                    await handlePayload(senderId, payload);
+                    await handlePayload(senderId, payload, pageId);
                     continue;
                 }
 
@@ -1153,7 +1213,7 @@ app.post("/webhook", (req, res) => {
                     // email/phone, treat this reply as that identifier
                     // instead of running it through the normal keyword engine.
                     if(isAwaitingRewardsIdentifier(senderId)){
-                        await handleRewardsIdentifierReply(senderId, messageText);
+                        await handleRewardsIdentifierReply(senderId, messageText, pageId);
                         continue;
                     }
 
@@ -1166,23 +1226,23 @@ app.post("/webhook", (req, res) => {
                     }
 
                     if(reply.type === "menu"){
-                        await sendQuickReplies(senderId, reply.text, reply.replies);
+                        await sendQuickReplies(senderId, reply.text, reply.replies, pageId);
                     }
                     else if(reply.type === "booking"){
-                        await sendBookingButton(senderId);
+                        await sendBookingButton(senderId, undefined, pageId);
                     }
                     else if(reply.type === "services"){
-                        await sendBranchMenu(senderId);
+                        await sendBranchMenu(senderId, pageId);
                     }
                     else if(reply.type === "promotions"){
-                        await sendPromotions(senderId);
+                        await sendPromotions(senderId, pageId);
                     }
                     else if(reply.type === "text"){
-                        await sendText(senderId, reply.text);
+                        await sendText(senderId, reply.text, pageId);
                     }
                     else if(reply.type === "unrecognized"){
                         if(shouldSendFallback(senderId)){
-                            await sendText(senderId, reply.text);
+                            await sendText(senderId, reply.text, pageId);
                         }
                         // else: stay silent, already replied to the first
                         // unrecognized message in this streak
@@ -1195,7 +1255,7 @@ app.post("/webhook", (req, res) => {
 
                     console.log("📌 POSTBACK:", payload);
 
-                    await handlePayload(senderId, payload);
+                    await handlePayload(senderId, payload, pageId);
                 }
             }
         }
@@ -1211,9 +1271,9 @@ app.post("/webhook", (req, res) => {
 |--------------------------------------------------------------------------
 */
 
-async function handlePayload(senderId, payload){
+async function handlePayload(senderId, payload, pageId){
 
-    console.log("📌 Handling Payload:", payload);
+    console.log("📌 Handling Payload:", payload, "on page", pageId);
 
     // Category + branch payloads look like "HAIR_MAKEUP__LAWIS" or
     // "MASSAGE__QUEZON" — the double underscore separates the two.
@@ -1222,7 +1282,7 @@ async function handlePayload(senderId, payload){
         const [category, branch] = payload.split("__");
 
         if(SERVICE_IMAGES[branch] && SERVICE_IMAGES[branch][category]){
-            await sendServiceImage(senderId, branch, category);
+            await sendServiceImage(senderId, branch, category, pageId);
             return;
         }
     }
@@ -1233,52 +1293,52 @@ async function handlePayload(senderId, payload){
             { title:"📅 Book Appointment", payload:"BOOK_APPOINTMENT" },
             { title:"⭐ Rewards", payload:"REWARDS" },
             { title:"📍 Locations", payload:"LOCATIONS" }
-        ]);
+        ], pageId);
         return;
     }
 
     if(payload === "SERVICES"){
-        await sendServicesPromosMenu(senderId);
+        await sendServicesPromosMenu(senderId, pageId);
         return;
     }
 
     if(payload === "OUR_PRICELIST"){
-        await sendBranchMenu(senderId);
+        await sendBranchMenu(senderId, pageId);
         return;
     }
 
     if(payload === "BRANCH_LAWIS"){
-        await sendServiceCategories(senderId, "LAWIS");
+        await sendServiceCategories(senderId, "LAWIS", pageId);
         return;
     }
 
     if(payload === "BRANCH_QUEZON"){
-        await sendServiceCategories(senderId, "QUEZON");
+        await sendServiceCategories(senderId, "QUEZON", pageId);
         return;
     }
 
     if(payload === "PROMOTIONS"){
-        await sendPromotions(senderId);
+        await sendPromotions(senderId, pageId);
         return;
     }
 
     if(payload === "BOOK_APPOINTMENT"){
-        await sendBookingButton(senderId);
+        await sendBookingButton(senderId, undefined, pageId);
         return;
     }
 
     if(payload === "REWARDS"){
-        await startRewardsFlow(senderId);
+        await startRewardsFlow(senderId, pageId);
         return;
     }
 
     if(payload === "DISCONNECT_REWARDS"){
-        await disconnectRewardsCustomer(senderId);
+        await disconnectRewardsCustomer(senderId, pageId);
         return;
     }
 
     if(payload === "LOCATIONS"){
-        await sendText(senderId, TEXTS.LOCATION);
+        await sendText(senderId, TEXTS.LOCATION, pageId);
         return;
     }
 }
