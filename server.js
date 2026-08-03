@@ -633,14 +633,35 @@ function handleMessage(messageText){
         return { type:"booking" };
     }
 
-    // Price Keywords
+// Price Keywords
     if(
         text.includes("price") ||
         text.includes("cost") ||
         text.includes("rate") ||
         text.includes("magkano") ||
         text.includes("how much") ||
-        /\bhm\b/.test(text)
+        /\bhm\b/.test(text) ||
+        // Category-specific keywords — all route to the same
+        // generic pricelist flow (branch menu → category menu)
+        text.includes("hair") ||
+        text.includes("nails") ||
+        text.includes("nail") ||
+        text.includes("manicure") ||
+        text.includes("pedicure") ||
+        text.includes("mani") ||
+        text.includes("pedi") ||
+        text.includes("gel polish") ||
+        text.includes("nail art") ||
+        text.includes("massage") ||
+        text.includes("facial") ||
+        text.includes("aesthetics") ||
+        text.includes("slimming") ||
+        text.includes("eyelash") ||
+        text.includes("lash") ||
+        text.includes("eyebrow") ||
+        text.includes("brows") ||
+        text.includes("balayage") ||
+        text.includes("waxing")
     ){
         return { type:"services" };
     }
@@ -1274,7 +1295,7 @@ app.post("/webhook", (req, res) => {
 async function handlePayload(senderId, payload, pageId){
 
     console.log("📌 Handling Payload:", payload, "on page", pageId);
-
+    q
     // Category + branch payloads look like "HAIR_MAKEUP__LAWIS" or
     // "MASSAGE__QUEZON" — the double underscore separates the two.
     // Checked first since these are dynamic, not fixed strings.
