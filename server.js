@@ -11,17 +11,50 @@ const PORT = process.env.PORT || 3000;
 
 /*
 |--------------------------------------------------------------------------
-| SERVICE PRICE LIST IMAGES
+| SERVICE PRICE LIST IMAGES (PER BRANCH)
 |--------------------------------------------------------------------------
+| Nested by branch, then category. ML Quezon has no FACIAL key on
+| purpose — that branch doesn't offer Facial & Slimming, so the
+| category is automatically hidden from its pricelist menu.
+|
+| TODO: Replace the ML Quezon placeholder URLs below with the real
+| pricelist image links for that branch.
 */
 
 const SERVICE_IMAGES = {
-    HAIR_MAKEUP: "https://user19535.na.imgto.link/public/20260731/price-hairmakeup.avif",
-    FACIAL: "https://user19535.na.imgto.link/public/20260731/price-aesthetics.avif",
-    MASSAGE: "https://user19535.na.imgto.link/public/20260731/price-massage.avif",
-    MAKEUP: "https://user19535.na.imgto.link/public/20260731/price-eyelash.avif",
-    NAILS: "https://user19535.na.imgto.link/public/20260731/price-nails.avif"
+    LAWIS: {
+        HAIR_MAKEUP: "https://user19535.na.imgto.link/public/20260731/price-hairmakeup.avif",
+        FACIAL: "https://user19535.na.imgto.link/public/20260731/price-aesthetics.avif",
+        MASSAGE: "https://user19535.na.imgto.link/public/20260731/price-massage.avif",
+        MAKEUP: "https://user19535.na.imgto.link/public/20260731/price-eyelash.avif",
+        NAILS: "https://user19535.na.imgto.link/public/20260731/price-nails.avif"
+    },
+    QUEZON: {
+        HAIR_MAKEUP: "https://user19535.na.imgto.link/public/20260731/price-hairmakeup.avif",
+        // NOTE: no FACIAL key here on purpose — ML Quezon doesn't offer this
+        MASSAGE: "https://user19535.na.imgto.link/public/20260731/price-massage.avif",
+        MAKEUP: "https://user19535.na.imgto.link/public/20260731/price-eyelash.avif",
+        NAILS: "https://user19535.na.imgto.link/public/20260731/price-nails.avif"
+    }
 };
+
+// Display metadata for each category, in the order they should appear
+// in the pricelist menu. The actual menu shown to a customer is
+// filtered down to whichever of these exist for their chosen branch.
+const SERVICE_CATEGORIES = [
+    { key:"HAIR_MAKEUP", title:"💇 Hair & Makeup" },
+    { key:"FACIAL", title:"✨ Facial & Slimming" },
+    { key:"MASSAGE", title:"💆 Massage & Waxing" },
+    { key:"MAKEUP", title:"👁️ Semi-Permanent Makeup & Eyelashes" },
+    { key:"NAILS", title:"💅 Nails & Relaxing Packages" }
+];
+
+// Display metadata for each branch, in the order they should appear
+// in the branch-selection menu.
+const BRANCHES = [
+    { key:"LAWIS", title:"📍 C. Lawis Ext." },
+    { key:"QUEZON", title:"📍 ML Quezon" }
+];
 
 
 /*
@@ -52,6 +85,9 @@ const TEXTS = {
 
     GREETING:
     "Hello! 👋 Welcome to Modifica Salon and Spa.\n\nHow can I assist you today?",
+
+    BRANCH_PROMPT:
+    "📍 Which branch's pricelist would you like to see?",
 
     SERVICES_PROMPT:
     "🏷️ Please Choose from our Pricelist Categories below:",
@@ -674,17 +710,39 @@ async function sendQuickReplies(senderId, text, replies){
 
 /*
 |--------------------------------------------------------------------------
-| SEND SERVICE IMAGE
+| SEND BRANCH SELECTION MENU
 |--------------------------------------------------------------------------
-| category must be one of the KEYS in SERVICE_IMAGES (e.g. "HAIR_MAKEUP"),
-| not the URL itself. Sends the pricelist image, then immediately follows
-| up with the booking button message. The "Check our Promotions" quick
-| reply is attached to that final booking message (NOT the image) since
-| Messenger clears quick replies as soon as a newer message is sent —
-| attaching it to the last message in the sequence keeps it visible.
+| Asks the customer which branch's pricelist they want to see. Their
+| choice comes back as a BRANCH_<key> payload (e.g. BRANCH_LAWIS),
+| which then drives sendServiceCategories() for that branch.
 */
 
-async function sendServiceImage(senderId, category){
+async function sendBranchMenu(senderId){
+    return sendQuickReplies(
+        senderId,
+        TEXTS.BRANCH_PROMPT,
+        BRANCHES.map(branch => ({
+            title: branch.title,
+            payload: `BRANCH_${branch.key}`
+        }))
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| SEND SERVICE IMAGE
+|--------------------------------------------------------------------------
+| category must be one of the KEYS in SERVICE_IMAGES[branch] (e.g.
+| "HAIR_MAKEUP"), not the URL itself. Sends the pricelist image, then
+| immediately follows up with the booking button message. The "Check
+| our Promotions" quick reply is attached to that final booking message
+| (NOT the image) since Messenger clears quick replies as soon as a
+| newer message is sent — attaching it to the last message in the
+| sequence keeps it visible.
+*/
+
+async function sendServiceImage(senderId, branch, category){
 
     await callMessengerAPI({
         recipient:{ id:senderId },
@@ -692,7 +750,7 @@ async function sendServiceImage(senderId, category){
             attachment:{
                 type:"image",
                 payload:{
-                    url:SERVICE_IMAGES[category],
+                    url:SERVICE_IMAGES[branch][category],
                     is_reusable:true
                 }
             }
@@ -735,19 +793,28 @@ async function sendServicesPromosMenu(senderId){
 |--------------------------------------------------------------------------
 | SEND SERVICE CATEGORY MENU
 |--------------------------------------------------------------------------
+| Shows the pricelist category menu for a specific branch. Categories
+| are filtered down to whichever ones actually exist in
+| SERVICE_IMAGES[branch] — e.g. ML Quezon has no FACIAL entry, so
+| "Facial & Slimming" simply won't appear as an option for that branch.
+| Each button's payload encodes both the category AND the branch
+| (e.g. "HAIR_MAKEUP__QUEZON") so the next tap doesn't need any extra
+| stored state to know which branch's image to send.
 */
 
-async function sendServiceCategories(senderId){
+async function sendServiceCategories(senderId, branch){
+
+    const availableCategories = SERVICE_CATEGORIES.filter(
+        category => SERVICE_IMAGES[branch] && SERVICE_IMAGES[branch][category.key]
+    );
+
     return sendQuickReplies(
         senderId,
         TEXTS.SERVICES_PROMPT,
-        [
-            { title:"💇 Hair & Makeup", payload:"HAIR_MAKEUP" },
-            { title:"✨ Facial & Slimming", payload:"FACIAL" },
-            { title:"💆 Massage & Waxing", payload:"MASSAGE" },
-            { title:"👁️ Semi-Permanent Makeup & Eyelashes", payload:"MAKEUP" },
-            { title:"💅 Nails & Relaxing Packages", payload:"NAILS" }
-        ]
+        availableCategories.map(category => ({
+            title: category.title,
+            payload: `${category.key}__${branch}`
+        }))
     );
 }
 
@@ -1092,7 +1159,7 @@ app.post("/webhook", (req, res) => {
                         await sendBookingButton(senderId);
                     }
                     else if(reply.type === "services"){
-                        await sendServiceCategories(senderId);
+                        await sendBranchMenu(senderId);
                     }
                     else if(reply.type === "promotions"){
                         await sendPromotions(senderId);
@@ -1135,6 +1202,18 @@ async function handlePayload(senderId, payload){
 
     console.log("📌 Handling Payload:", payload);
 
+    // Category + branch payloads look like "HAIR_MAKEUP__LAWIS" or
+    // "MASSAGE__QUEZON" — the double underscore separates the two.
+    // Checked first since these are dynamic, not fixed strings.
+    if(payload.includes("__")){
+        const [category, branch] = payload.split("__");
+
+        if(SERVICE_IMAGES[branch] && SERVICE_IMAGES[branch][category]){
+            await sendServiceImage(senderId, branch, category);
+            return;
+        }
+    }
+
     if(payload === "GET_STARTED"){
         await sendQuickReplies(senderId, TEXTS.GREETING, [
             { title:"💅 Services & Promos", payload:"SERVICES" },
@@ -1151,32 +1230,17 @@ async function handlePayload(senderId, payload){
     }
 
     if(payload === "OUR_PRICELIST"){
-        await sendServiceCategories(senderId);
+        await sendBranchMenu(senderId);
         return;
     }
 
-    if(payload === "HAIR_MAKEUP"){
-        await sendServiceImage(senderId, "HAIR_MAKEUP");
+    if(payload === "BRANCH_LAWIS"){
+        await sendServiceCategories(senderId, "LAWIS");
         return;
     }
 
-    if(payload === "FACIAL"){
-        await sendServiceImage(senderId, "FACIAL");
-        return;
-    }
-
-    if(payload === "MASSAGE"){
-        await sendServiceImage(senderId, "MASSAGE");
-        return;
-    }
-
-    if(payload === "MAKEUP"){
-        await sendServiceImage(senderId, "MAKEUP");
-        return;
-    }
-
-    if(payload === "NAILS"){
-        await sendServiceImage(senderId, "NAILS");
+    if(payload === "BRANCH_QUEZON"){
+        await sendServiceCategories(senderId, "QUEZON");
         return;
     }
 
