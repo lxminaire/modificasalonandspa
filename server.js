@@ -1296,7 +1296,7 @@ app.post("/webhook", (req, res) => {
 async function handlePayload(senderId, payload, pageId){
 
     console.log("📌 Handling Payload:", payload, "on page", pageId);
-    q
+
     // Category + branch payloads look like "HAIR_MAKEUP__LAWIS" or
     // "MASSAGE__QUEZON" — the double underscore separates the two.
     // Checked first since these are dynamic, not fixed strings.
