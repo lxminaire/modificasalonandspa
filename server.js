@@ -1369,4 +1369,4 @@ async function handlePayload(senderId, payload, pageId){
 app.listen(PORT, async () => {
     console.log(`🚀 Server running on port ${PORT}`);
     await setMessengerProfile();
-});
+}); 
