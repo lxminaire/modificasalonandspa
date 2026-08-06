@@ -133,8 +133,11 @@ const TEXTS = {
     LOCATION:
     "Our branches are located at: \n\n 📍 C. Lawis Ext., Brgy. San Luis, Antipolo City (Near Genesis College & Cerlas Hardware). \n\n 📍ML Quezon Ext., Brgy. Dalig, Antipolo City (In front of Vista Mall Antipolo).",
 
+    STORE_HOURS:
+    "🕒 Store Hours\n\n📍 ML Quezon Branch:\nMonday to Thursday: 10am – 7pm\nFriday to Sunday: 10am – 8pm\n\n📍 C. Lawis Ext., San Luis Branch:\nDaily: 10am – 9pm",
+
     UNRECOGNIZED:
-    "I'm sorry, I didn't understand that. 😊\n\nYou can ask about:\n\n💅 Services\n📅 Appointments\n⭐ Rewards\n📍 Locations\n\n📞 For further assistance, you may contact us directly at +63 915 627 3312.",
+    "I'm sorry, I didn't understand that. 😊\n\nYou can ask about:\n\n💅 Services\n📅 Appointments\n⭐ Rewards\n🕒 Store Hours\n📍 Locations\n\n📞 For further assistance, you may contact us directly at +63 915 627 3312.",
 
     REWARDS:
     "⭐ Modifica Rewards is coming soon!\n\nYour loyalty points and exclusive rewards will be available here.",
@@ -618,6 +621,7 @@ function handleMessage(messageText){
                 { title:"💅 Services & Promos", payload:"SERVICES" },
                 { title:"📅 Book Appointment", payload:"BOOK_APPOINTMENT" },
                 { title:"⭐ Rewards", payload:"REWARDS" },
+                { title:"🕒 Store Hours", payload:"STORE_HOURS" },
                 { title:"📍 Locations", payload:"LOCATIONS" }
             ]
         };
@@ -633,7 +637,7 @@ function handleMessage(messageText){
         return { type:"booking" };
     }
 
-// Price Keywords
+    // Price Keywords
     if(
         text.includes("price") ||
         text.includes("cost") ||
@@ -690,6 +694,22 @@ function handleMessage(messageText){
         return {
             type:"text",
             text: TEXTS.LOCATION
+        };
+    }
+
+    // Store Hours Keywords
+    if(
+        text.includes("hours") ||
+        text.includes("open") ||
+        text.includes("close") ||
+        text.includes("closing") ||
+        text.includes("opening") ||
+        text.includes("anong oras") ||
+        text.includes("bukas")
+    ){
+        return {
+            type:"text",
+            text: TEXTS.STORE_HOURS
         };
     }
 
@@ -1315,6 +1335,7 @@ async function handlePayload(senderId, payload, pageId){
             { title:"💅 Services & Promos", payload:"SERVICES" },
             { title:"📅 Book Appointment", payload:"BOOK_APPOINTMENT" },
             { title:"⭐ Rewards", payload:"REWARDS" },
+            { title:"🕒 Store Hours", payload:"STORE_HOURS" },
             { title:"📍 Locations", payload:"LOCATIONS" }
         ], pageId);
         return;
@@ -1360,6 +1381,11 @@ async function handlePayload(senderId, payload, pageId){
         return;
     }
 
+    if(payload === "STORE_HOURS"){
+        await sendText(senderId, TEXTS.STORE_HOURS, pageId);
+        return;
+    }
+
     if(payload === "LOCATIONS"){
         await sendText(senderId, TEXTS.LOCATION, pageId);
         return;
@@ -1370,4 +1396,4 @@ async function handlePayload(senderId, payload, pageId){
 app.listen(PORT, async () => {
     console.log(`🚀 Server running on port ${PORT}`);
     await setMessengerProfile();
-}); 
+});
