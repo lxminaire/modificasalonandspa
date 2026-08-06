@@ -131,7 +131,7 @@ const TEXTS = {
     "💅 Services & Promos\n\nWhat would you like to check out?",
 
     LOCATION:
-    "This branch is located at 📍 C. Lawis Ext., Brgy. San Luis, Antipolo City (Near Genesis College & Cerlas Hardware). \n\n 📍We also have a branch in ML Quezon Ext., Brgy. Dalig, Antipolo City (In front of Vista Mall Antipolo).",
+    "Our branches our located at:📍 C. Lawis Ext., Brgy. San Luis, Antipolo City (Near Genesis College & Cerlas Hardware). \n\n 📍ML Quezon Ext., Brgy. Dalig, Antipolo City (In front of Vista Mall Antipolo).",
 
     UNRECOGNIZED:
     "I'm sorry, I didn't understand that. 😊\n\nYou can ask about:\n\n💅 Services\n📅 Appointments\n⭐ Rewards\n📍 Locations\n\n📞 For further assistance, you may contact us directly at +63 915 627 3312.",
@@ -683,6 +683,7 @@ function handleMessage(messageText){
     if(
         text.includes("location") ||
         text.includes("address") ||
+        text.includes("landmark") ||
         text.includes("branch") ||
         /\bloc\b/.test(text)
     ){
