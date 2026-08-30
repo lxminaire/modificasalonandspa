@@ -203,11 +203,22 @@ function isFbInstantReply(text){
 
     const normalized = text.replace(/\s+/g, " ").trim();
 
-    const matches = /^Hi\s+.+?!\s*Thank you for contacting Modifica Salon and Spa\.\s*For a faster response, please call or text us at 09156273312\.\s*We look forward to assisting you!?$/is.test(normalized);
+    // Deliberately NOT a single ^...$ full-string match anymore — FB can
+    // add trailing content after "assisting you" (e.g. an emoji like
+    // "😊"), which broke the old anchored regex. Instead, just require
+    // the message to start with a greeting and contain the core phrases
+    // that only this automation sends. Order-independent and tolerant
+    // of extra punctuation/emoji anywhere before/after each phrase.
+    const startsAsGreeting = /^Hi\s+\S+/i.test(normalized);
+    const hasThankYouLine = /Thank you for contacting Modifica Salon and Spa/i.test(normalized);
+    const hasPhoneLine = /For a faster response,?\s*please call or text us at 09156273312/i.test(normalized);
+    const hasClosingLine = /We look forward to assisting you/i.test(normalized);
+
+    const matches = startsAsGreeting && hasThankYouLine && hasPhoneLine && hasClosingLine;
 
     if(!matches){
         // Helpful when FB tweaks the Instant Reply wording again in the future —
-        // compare this logged string against the pattern above to see what drifted.
+        // compare this logged string against the phrases above to see what drifted.
         console.log("🔍 FB Instant Reply check — no match. Normalized text was:", JSON.stringify(normalized));
     }
 
@@ -680,9 +691,13 @@ function handleMessage(messageText){
     // Price Keywords
     if(
         text.includes("price") ||
-        text.includes("service") ||
-        text.includes("services") ||
         text.includes("cost") ||
+        text.includes("service") || 
+        text.includes("services") ||
+        text.includes("Services") ||
+        text.includes("Services") ||
+        text.includes("SERVICE") ||
+        text.includes("SERVICES") ||
         text.includes("rate") ||
         text.includes("magkano") ||
         text.includes("how much") ||
