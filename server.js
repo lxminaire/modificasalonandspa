@@ -177,13 +177,24 @@ function buildRewardsPointsMessage(points){
 
 const REWARDS_POINTS_PATTERN = /^⭐ You currently have \d+ loyalty points? at Modifica Salon and Spa!\n\nKeep booking to earn more and unlock rewards\. 🎁$/;
 
+// Facebook's own built-in "Instant Reply" automation (a Page Inbox
+// setting, not this bot) fires the first time a customer messages the
+// Page, and personalizes the greeting with their Facebook name (e.g.
+// "Hi James!"), so it can never match a fixed string in KNOWN_BOT_TEXTS.
+// Recognized by pattern instead so it isn't mistaken for a human agent
+// typing directly and doesn't trigger hibernation.
+const FB_INSTANT_REPLY_PATTERN = /^Hi .+! Thank you for contacting Modifica Salon and Spa\. For a faster response, please call or text us at 09156273312\. We look forward to assisting you!$/;
+
 const KNOWN_BOT_TEXTS = new Set(Object.values(TEXTS));
 
 // Use this instead of KNOWN_BOT_TEXTS.has() directly wherever bot-authored
-// text needs to be recognized — covers both fixed strings and the dynamic
-// rewards points message.
+// (or otherwise automated) text needs to be recognized — covers fixed
+// strings, the dynamic rewards points message, and Facebook's own
+// Instant Reply automation.
 function isKnownBotText(text){
-    return KNOWN_BOT_TEXTS.has(text) || REWARDS_POINTS_PATTERN.test(text);
+    return KNOWN_BOT_TEXTS.has(text) ||
+        REWARDS_POINTS_PATTERN.test(text) ||
+        FB_INSTANT_REPLY_PATTERN.test(text);
 }
 
 
