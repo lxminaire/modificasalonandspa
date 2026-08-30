@@ -183,7 +183,36 @@ const REWARDS_POINTS_PATTERN = /^⭐ You currently have \d+ loyalty points? at M
 // "Hi James!"), so it can never match a fixed string in KNOWN_BOT_TEXTS.
 // Recognized by pattern instead so it isn't mistaken for a human agent
 // typing directly and doesn't trigger hibernation.
-const FB_INSTANT_REPLY_PATTERN = /^Hi .+! Thank you for contacting Modifica Salon and Spa\. For a faster response, please call or text us at 09156273312\. We look forward to assisting you!$/;
+//
+// NOTE: this used to be a plain anchored regex, but it was unreliable —
+// the real-world text FB sends can contain a line break (e.g. an emoji
+// after the name, or a blank line before "Thank you for contacting..."),
+// and JS's `.` does NOT match newlines by default, so `.+` couldn't
+// bridge that gap and the whole ^...$ match silently failed. Small
+// formatting differences (double spaces, curly punctuation, a missing
+// trailing "!") could break it too since it required an exact
+// start-to-end match.
+//
+// Fix: collapse all whitespace (including newlines) down to single
+// spaces before testing, and match case-insensitively with the "s"
+// (dotall) flag as a safety net. This makes detection robust to
+// whitespace/formatting quirks while still requiring the actual
+// Instant Reply wording to be present.
+function isFbInstantReply(text){
+    if(!text) return false;
+
+    const normalized = text.replace(/\s+/g, " ").trim();
+
+    const matches = /^Hi\s+.+?!\s*Thank you for contacting Modifica Salon and Spa\.\s*For a faster response, please call or text us at 09156273312\.\s*We look forward to assisting you!?$/is.test(normalized);
+
+    if(!matches){
+        // Helpful when FB tweaks the Instant Reply wording again in the future —
+        // compare this logged string against the pattern above to see what drifted.
+        console.log("🔍 FB Instant Reply check — no match. Normalized text was:", JSON.stringify(normalized));
+    }
+
+    return matches;
+}
 
 const KNOWN_BOT_TEXTS = new Set(Object.values(TEXTS));
 
@@ -194,7 +223,7 @@ const KNOWN_BOT_TEXTS = new Set(Object.values(TEXTS));
 function isKnownBotText(text){
     return KNOWN_BOT_TEXTS.has(text) ||
         REWARDS_POINTS_PATTERN.test(text) ||
-        FB_INSTANT_REPLY_PATTERN.test(text);
+        isFbInstantReply(text);
 }
 
 
@@ -651,6 +680,8 @@ function handleMessage(messageText){
     // Price Keywords
     if(
         text.includes("price") ||
+        text.includes("service") ||
+        text.includes("services") ||
         text.includes("cost") ||
         text.includes("rate") ||
         text.includes("magkano") ||
