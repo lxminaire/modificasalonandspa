@@ -50,7 +50,7 @@ const SERVICE_CATEGORIES = [
 // in the branch-selection menu.
 const BRANCHES = [
     { key:"LAWIS", title:"📍 C. Lawis Ext." },
-    { key:"QUEZON", title:"📍 ML Quezon" }
+    { key:"QUEZON", title:"📍 ML Quezon Ext." }
 ];
 
 
@@ -134,7 +134,7 @@ const TEXTS = {
     "Our branches are located at: \n\n 📍 C. Lawis Ext., Brgy. San Luis, Antipolo City (Near Genesis College & Cerlas Hardware). \n\n 📍ML Quezon Ext., Brgy. Dalig, Antipolo City (In front of Vista Mall Antipolo).",
 
     STORE_HOURS:
-    "🕒 Store Hours\n\n📍 ML Quezon Branch:\nMonday to Thursday: 10am – 7pm\nFriday to Sunday: 10am – 8pm\n\n📍 C. Lawis Ext., San Luis Branch:\nDaily: 10am – 9pm",
+    "🕒 Store Hours\n\n📍 ML Quezon Ext. Branch:\nMonday to Thursday: 10am – 7pm\nFriday to Sunday: 10am – 8pm\n\n📍 C. Lawis Ext., San Luis Branch:\nDaily: 10am – 9pm",
 
     UNRECOGNIZED:
     "I'm sorry, I didn't understand that. 😊\n\nYou can ask about:\n\n💅 Services\n📅 Appointments\n⭐ Rewards\n🕒 Store Hours\n📍 Locations\n\n📞 For further assistance, you may contact us directly at +63 915 627 3312.",
