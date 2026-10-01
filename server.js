@@ -99,10 +99,12 @@ function getPageAccessToken(pageId){
 */
 
 const PROMO_IMAGES = [
-    "https://user19535.na.imgto.link/public/20260731/deals1.avif",
-    "https://user19535.na.imgto.link/public/20260731/deals2.avif",
-    "https://user19535.na.imgto.link/public/20260731/deals3.avif",
-    "https://user19535.na.imgto.link/public/20260731/deals4.avif"
+    "https://user39287.na.imgto.link/public/20261001/earlyber1-1.avif",
+    "https://user39287.na.imgto.link/public/20261001/earlyber2-1.avif",
+    "https://user39287.na.imgto.link/public/20261001/earlyber3-1.avif",
+    "https://user39287.na.imgto.link/public/20261001/earlyber4-1.avif",
+    "https://user39287.na.imgto.link/public/20261001/earlyber5.avif",
+    "https://user39287.na.imgto.link/public/20261001/earlyber6.avif"
 ];
 
 
