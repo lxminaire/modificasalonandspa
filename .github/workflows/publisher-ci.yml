@@ -28,3 +28,9 @@ jobs:
 
       - name: Check cloud queue module
         run: node --check src/cloudQueue.mjs
+
+      - name: Check social campaign review module
+        run: node --check src/socialCampaignReview.mjs
+
+      - name: Check social dashboard client
+        run: node --check social-dashboard/app.js
