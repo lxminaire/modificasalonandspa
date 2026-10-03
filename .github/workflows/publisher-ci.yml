@@ -1,0 +1,30 @@
+name: Publisher CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  publisher-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      - name: Check Messenger bot syntax
+        run: node --check server.js
+
+      - name: Check publisher syntax
+        run: node --check publisher.mjs
+
+      - name: Check cloud queue module
+        run: node --check src/cloudQueue.mjs
