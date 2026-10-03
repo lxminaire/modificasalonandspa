@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start:bot": "node server.js",
-    "start:publisher": "node publisher.mjs"
+    "start:publisher": "node publisher.mjs",
+    "start:social": "node social-studio.mjs"
   },
   "keywords": [],
   "author": "",
