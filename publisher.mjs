@@ -17,8 +17,24 @@ let lastRunResult = null;
 let lastRunError = null;
 let tickRunning = false;
 
+function missingPublisherEnv() {
+  const required = [
+    "SUPABASE_SECRET_KEY",
+    "MLQ_PAGE_ID",
+    "MLQ_PAGE_ACCESS_TOKEN",
+    "C_LAWIS_PAGE_ID",
+    "C_LAWIS_PAGE_ACCESS_TOKEN",
+  ];
+
+  return required.filter((key) => !String(process.env[key] || "").trim());
+}
+
+function publisherReady() {
+  return shouldRunCloudPublisher() && missingPublisherEnv().length === 0;
+}
+
 async function tick(reason = "interval") {
-  if (tickRunning) return;
+  if (tickRunning || !publisherReady()) return;
 
   tickRunning = true;
   lastRunStartedAt = new Date().toISOString();
@@ -42,7 +58,8 @@ app.get("/", (_req, res) => {
     service: "Modifica Facebook Publisher",
     role: getAppRole(),
     configured: isCloudQueueConfigured(),
-    publisherEnabled: shouldRunCloudPublisher(),
+    publisherEnabled: publisherReady(),
+    missingEnvironment: missingPublisherEnv(),
     workerId,
   });
 });
@@ -55,7 +72,8 @@ app.get("/health", (_req, res) => {
     service: "Modifica Facebook Publisher",
     role: getAppRole(),
     configured: isCloudQueueConfigured(),
-    publisherEnabled: shouldRunCloudPublisher(),
+    publisherEnabled: publisherReady(),
+    missingEnvironment: missingPublisherEnv(),
     tickRunning,
     lastRunStartedAt,
     lastRunFinishedAt,
@@ -68,9 +86,9 @@ app.listen(port, "0.0.0.0", () => {
   console.log(`Modifica Facebook publisher listening on port ${port}`);
   console.log(`APP_ROLE=${getAppRole()}`);
   console.log(
-    shouldRunCloudPublisher()
+    publisherReady()
       ? "Cloud publisher enabled."
-      : "Cloud publisher is waiting for its server-side environment variables.",
+      : `Cloud publisher waiting for: ${missingPublisherEnv().join(", ") || "Supabase configuration"}`,
   );
 
   setTimeout(() => {
