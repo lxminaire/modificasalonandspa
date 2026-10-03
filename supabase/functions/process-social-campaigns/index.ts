@@ -209,6 +209,21 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  if (req.method === "GET") {
+    const configured = Boolean(
+      String(Deno.env.get("GEMINI_API_KEY") || "").trim(),
+    );
+    const model =
+      clean(Deno.env.get("GEMINI_MODEL")) || DEFAULT_MODEL;
+
+    return json({
+      ok: true,
+      service: "Modifica Social AI Processor",
+      configured,
+      model,
+    });
+  }
+
   if (req.method !== "POST") {
     return json({ error: "Method not allowed" }, 405);
   }
