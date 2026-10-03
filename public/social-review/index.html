@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Modifica Social Review</title>
+  <meta name="theme-color" content="#292929" />
+  <link rel="preconnect" href="https://api.fontshare.com" />
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700,900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/social-review/styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">MODIFICA SOCIAL</p>
+        <h1>Campaign review.</h1>
+        <p class="lede">
+          Website campaigns arrive here first. Review the AI caption, schedule,
+          imagery, and branch before anything enters the Facebook publishing queue.
+        </p>
+      </div>
+      <div class="hero-actions">
+        <button id="refreshButton" class="button secondary" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <section class="stats" aria-label="Campaign status overview">
+      <article><span>Incoming</span><strong id="incomingCount">0</strong></article>
+      <article><span>Ready for review</span><strong id="reviewCount">0</strong></article>
+      <article><span>Queued</span><strong id="queuedCount">0</strong></article>
+      <article><span>Published</span><strong id="publishedCount">0</strong></article>
+    </section>
+
+    <section class="workspace">
+      <aside class="campaign-list-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow muted">INCOMING CAMPAIGNS</p>
+            <h2>Website handoff</h2>
+          </div>
+          <select id="statusFilter" aria-label="Filter campaigns by status">
+            <option value="all">All statuses</option>
+            <option value="received">Received</option>
+            <option value="processing">Processing</option>
+            <option value="ready_for_review">Ready for review</option>
+            <option value="failed">Failed</option>
+            <option value="queued">Queued</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="published">Published</option>
+          </select>
+        </div>
+
+        <div id="campaignList" class="campaign-list">
+          <div class="empty-state">Loading campaigns…</div>
+        </div>
+      </aside>
+
+      <section class="review-panel">
+        <div id="emptyReview" class="empty-review">
+          <div class="empty-icon">↗</div>
+          <h2>Select a campaign</h2>
+          <p>Choose an incoming campaign to review its caption, images, schedule, and queue status.</p>
+        </div>
+
+        <div id="reviewContent" hidden>
+          <div class="review-topline">
+            <div>
+              <p id="reviewSource" class="eyebrow muted">WEBSITE CAMPAIGN</p>
+              <h2 id="reviewTitle">Campaign</h2>
+              <p id="reviewMeta" class="meta"></p>
+            </div>
+            <span id="reviewStatus" class="status-badge">received</span>
+          </div>
+
+          <div id="imageGrid" class="image-grid"></div>
+
+          <div class="detail-grid">
+            <article>
+              <span>Audience</span>
+              <strong id="reviewAudience">—</strong>
+            </article>
+            <article>
+              <span>Tone</span>
+              <strong id="reviewTone">—</strong>
+            </article>
+            <article>
+              <span>Branch</span>
+              <strong id="reviewBranch">—</strong>
+            </article>
+            <article>
+              <span>Schedule</span>
+              <strong id="reviewSchedule">—</strong>
+            </article>
+          </div>
+
+          <div class="copy-block">
+            <p class="eyebrow muted">CAMPAIGN CONTEXT</p>
+            <p id="reviewDescription" class="description"></p>
+          </div>
+
+          <label class="field">
+            <span>Final caption</span>
+            <textarea id="captionInput" rows="9"></textarea>
+            <small id="captionHint"></small>
+          </label>
+
+          <label class="field">
+            <span>Publish schedule</span>
+            <input id="scheduleInput" type="datetime-local" />
+            <small>Philippine time. Keep at least 11 minutes of lead time for Facebook native scheduling.</small>
+          </label>
+
+          <div id="reviewError" class="message error" hidden></div>
+          <div id="reviewSuccess" class="message success" hidden></div>
+
+          <div class="action-row">
+            <button id="saveButton" class="button secondary" type="button">Save changes</button>
+            <button id="approveButton" class="button primary" type="button">Approve & Queue</button>
+          </div>
+
+          <details class="technical">
+            <summary>Technical details</summary>
+            <pre id="technicalPayload"></pre>
+          </details>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/social-review/app.js"></script>
+</body>
+</html>
