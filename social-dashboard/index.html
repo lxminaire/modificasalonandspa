@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Modifica Social</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <section id="loginView" class="login-view">
+      <div class="login-brand">
+        <p class="eyebrow">MODIFICA SALON & SPA</p>
+        <h1>Modifica Social</h1>
+        <p class="lede">Review website campaigns before they enter the Facebook publishing queue.</p>
+      </div>
+
+      <form id="loginForm" class="login-card">
+        <p class="kicker">OWNER ACCESS</p>
+        <h2>Sign in to Social.</h2>
+        <label>
+          <span>Email</span>
+          <input id="emailInput" type="email" autocomplete="email" required />
+        </label>
+        <label>
+          <span>Password</span>
+          <input id="passwordInput" type="password" autocomplete="current-password" required />
+        </label>
+        <p id="loginError" class="error-text" hidden></p>
+        <button id="loginButton" class="button primary" type="submit">Sign in</button>
+      </form>
+    </section>
+
+    <section id="dashboardView" class="dashboard-view" hidden>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">MODIFICA SALON & SPA</p>
+          <h1>Modifica Social</h1>
+          <p class="subtitle">Website intake → review → Facebook queue</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="connection-pill">
+            <span class="dot"></span>
+            <span id="connectionText">Connected</span>
+          </div>
+          <button id="refreshButton" class="button ghost" type="button">Refresh</button>
+          <button id="logoutButton" class="button ghost" type="button">Log out</button>
+        </div>
+      </header>
+
+      <section class="summary">
+        <article>
+          <span class="summary-label">Incoming</span>
+          <strong id="incomingCount">0</strong>
+        </article>
+        <article>
+          <span class="summary-label">Ready for review</span>
+          <strong id="reviewCount">0</strong>
+        </article>
+        <article>
+          <span class="summary-label">Queued</span>
+          <strong id="queuedCount">0</strong>
+        </article>
+        <article>
+          <span class="summary-label">Published</span>
+          <strong id="publishedCount">0</strong>
+        </article>
+      </section>
+
+      <section class="toolbar">
+        <div id="filters" class="filters">
+          <button class="filter active" data-status="all" type="button">All</button>
+          <button class="filter" data-status="received" type="button">Received</button>
+          <button class="filter" data-status="processing" type="button">Processing</button>
+          <button class="filter" data-status="ready_for_review" type="button">Ready for review</button>
+          <button class="filter" data-status="failed" type="button">Failed</button>
+          <button class="filter" data-status="queued" type="button">Queued</button>
+        </div>
+        <span id="lastUpdated" class="last-updated"></span>
+      </section>
+
+      <div id="globalError" class="global-error" hidden></div>
+
+      <section class="workspace">
+        <aside class="campaign-list-wrap">
+          <div class="panel-heading">
+            <div>
+              <p class="kicker">INCOMING CAMPAIGNS</p>
+              <h2>Review queue</h2>
+            </div>
+            <span id="campaignTotal" class="count-pill">0</span>
+          </div>
+          <div id="campaignList" class="campaign-list"></div>
+        </aside>
+
+        <section id="campaignDetail" class="campaign-detail">
+          <div class="empty-detail">
+            <div class="empty-icon">↗</div>
+            <h2>Select a campaign</h2>
+            <p>Campaign details, AI caption, images, schedule, and approval controls will appear here.</p>
+          </div>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
