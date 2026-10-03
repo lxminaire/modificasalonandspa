@@ -330,6 +330,36 @@ Deno.serve(async (req) => {
       (item) => item.outcome === "failed",
     ).length;
 
+    const receivedCampaignIds = results
+      .filter((item) => item.outcome === "received")
+      .map((item) => String(item.campaignId || ""))
+      .filter(Boolean);
+
+    const geminiConfigured = Boolean(
+      String(Deno.env.get("GEMINI_API_KEY") || "").trim(),
+    );
+
+    if (geminiConfigured && receivedCampaignIds.length > 0) {
+      const processUrl =
+        `${socialUrl}/functions/v1/process-social-campaigns`;
+
+      EdgeRuntime.waitUntil(
+        fetch(processUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serviceRoleKey}`,
+            apikey: serviceRoleKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            campaignIds: receivedCampaignIds,
+          }),
+        }).catch((error) => {
+          console.error("Unable to start AI campaign processing:", error);
+        }),
+      );
+    }
+
     return json({
       batchId,
       batchName,
@@ -338,6 +368,11 @@ Deno.serve(async (req) => {
       received,
       duplicates,
       failed,
+      aiProcessing: {
+        configured: geminiConfigured,
+        started: geminiConfigured && receivedCampaignIds.length > 0,
+        campaignCount: receivedCampaignIds.length,
+      },
       results,
     });
   } catch (error) {
