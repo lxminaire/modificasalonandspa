@@ -1642,6 +1642,303 @@ export async function cancelPreparedCloudPost(
 
 
 
+function getNativeScheduledPostId(result) {
+  if (!result || typeof result !== "object") {
+    return "";
+  }
+
+  return String(
+    result.scheduledPostId ||
+      result.postId ||
+      result.verification?.scheduledPostId ||
+      "",
+  ).trim();
+}
+
+function assertManagedPublishTime(publishAt) {
+  const date = new Date(publishAt);
+
+  if (!Number.isFinite(date.getTime())) {
+    throw new Error("Publish time is invalid.");
+  }
+
+  if (date.getTime() <= Date.now() + 11 * 60 * 1000) {
+    throw new Error(
+      "Choose a publish time at least 11 minutes in the future.",
+    );
+  }
+
+  return date;
+}
+
+export async function editManagedCloudPost({
+  id,
+  caption,
+  publishAt,
+}) {
+  const supabase = getSupabase();
+  const cleanId = String(id || "").trim();
+  const cleanCaption = String(caption || "").trim();
+  const publishDate = assertManagedPublishTime(publishAt);
+
+  if (!cleanId) {
+    throw new Error("Cloud post ID is required.");
+  }
+
+  if (!cleanCaption) {
+    throw new Error("Caption cannot be empty.");
+  }
+
+  const { data: post, error } = await supabase
+    .from("cloud_posts")
+    .select("*")
+    .eq("id", cleanId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Unable to load scheduled post: ${error.message}`,
+    );
+  }
+
+  if (!post) {
+    throw new Error("Scheduled post was not found.");
+  }
+
+  if (["ready", "retry"].includes(post.status)) {
+    return updatePreparedCloudPost({
+      id: cleanId,
+      caption: cleanCaption,
+      publishAt: publishDate.toISOString(),
+    });
+  }
+
+  if (post.status !== "scheduled") {
+    throw new Error(
+      "This post is already publishing, published, cancelled, or otherwise no longer editable.",
+    );
+  }
+
+  const selectedPages = getFacebookPages(post.page);
+  const results = parseResults(post.facebook_results);
+  const resultByPage = new Map(
+    results.map((result) => [result.page, result]),
+  );
+  const scheduledUnix = Math.floor(publishDate.getTime() / 1000);
+  const updatedResults = [];
+  const failures = [];
+
+  for (const selectedPage of selectedPages) {
+    const prior = resultByPage.get(selectedPage.key);
+    const postId = getNativeScheduledPostId(prior);
+
+    if (!selectedPage.pageId || !selectedPage.accessToken) {
+      failures.push(
+        `${selectedPage.key}: Facebook Page configuration is missing.`,
+      );
+      continue;
+    }
+
+    if (!postId) {
+      failures.push(
+        `${selectedPage.key}: scheduled Facebook post ID is missing.`,
+      );
+      continue;
+    }
+
+    try {
+      const params = new URLSearchParams();
+      params.append("message", cleanCaption);
+      params.append("scheduled_publish_time", String(scheduledUnix));
+      params.append("access_token", selectedPage.accessToken);
+
+      await axios.post(
+        `https://graph.facebook.com/${FACEBOOK_GRAPH_VERSION}/${encodeURIComponent(postId)}`,
+        params,
+        {
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          timeout: FACEBOOK_TIMEOUT_MS,
+        },
+      );
+
+      updatedResults.push({
+        ...prior,
+        page: selectedPage.key,
+        success: true,
+        nativeScheduled: true,
+        scheduledPostId: postId,
+        postId,
+        scheduledPublishTime: scheduledUnix,
+        verification: {
+          ...(prior?.verification || {}),
+          verified: true,
+          verifiedBy: "owner_edit",
+          verifiedAt: new Date().toISOString(),
+          scheduledPostId: postId,
+          scheduledPublishTime: scheduledUnix,
+        },
+      });
+    } catch (updateError) {
+      failures.push(
+        `${selectedPage.key}: ${
+          updateError.response?.data?.error?.message ||
+          updateError.message ||
+          String(updateError)
+        }`,
+      );
+      updatedResults.push(prior);
+    }
+  }
+
+  if (failures.length > 0) {
+    await updateCloudPost(cleanId, {
+      facebook_results: updatedResults,
+      last_error:
+        "Scheduled post edit was only partially applied: " +
+        failures.join(" | "),
+    });
+
+    throw new Error(
+      "Scheduled post edit was only partially applied: " +
+        failures.join(" | "),
+    );
+  }
+
+  return updateCloudPost(cleanId, {
+    caption: cleanCaption,
+    publish_at: publishDate.toISOString(),
+    facebook_results: updatedResults,
+    last_error: null,
+  });
+}
+
+export async function cancelManagedCloudPost(id) {
+  const supabase = getSupabase();
+  const cleanId = String(id || "").trim();
+
+  if (!cleanId) {
+    throw new Error("Cloud post ID is required.");
+  }
+
+  const { data: post, error } = await supabase
+    .from("cloud_posts")
+    .select("*")
+    .eq("id", cleanId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Unable to load scheduled post: ${error.message}`,
+    );
+  }
+
+  if (!post) {
+    throw new Error("Scheduled post was not found.");
+  }
+
+  if (["ready", "retry", "failed"].includes(post.status)) {
+    return cancelPreparedCloudPost(cleanId);
+  }
+
+  if (post.status !== "scheduled") {
+    throw new Error(
+      "This post is already publishing, published, cancelled, or otherwise no longer deletable.",
+    );
+  }
+
+  const selectedPages = getFacebookPages(post.page);
+  const results = parseResults(post.facebook_results);
+  const resultByPage = new Map(
+    results.map((result) => [result.page, result]),
+  );
+  const updatedResults = [];
+  const failures = [];
+
+  for (const selectedPage of selectedPages) {
+    const prior = resultByPage.get(selectedPage.key);
+    const postId = getNativeScheduledPostId(prior);
+
+    if (!selectedPage.pageId || !selectedPage.accessToken) {
+      failures.push(
+        `${selectedPage.key}: Facebook Page configuration is missing.`,
+      );
+      updatedResults.push(prior);
+      continue;
+    }
+
+    if (!postId) {
+      failures.push(
+        `${selectedPage.key}: scheduled Facebook post ID is missing.`,
+      );
+      updatedResults.push(prior);
+      continue;
+    }
+
+    try {
+      const response = await axios.delete(
+        `https://graph.facebook.com/${FACEBOOK_GRAPH_VERSION}/${encodeURIComponent(postId)}`,
+        {
+          params: {
+            access_token: selectedPage.accessToken,
+          },
+          timeout: FACEBOOK_TIMEOUT_MS,
+        },
+      );
+
+      if (response.data?.success === false) {
+        throw new Error("Facebook did not confirm deletion.");
+      }
+
+      updatedResults.push({
+        ...prior,
+        page: selectedPage.key,
+        success: false,
+        cancelled: true,
+        cancelledAt: new Date().toISOString(),
+      });
+    } catch (deleteError) {
+      failures.push(
+        `${selectedPage.key}: ${
+          deleteError.response?.data?.error?.message ||
+          deleteError.message ||
+          String(deleteError)
+        }`,
+      );
+      updatedResults.push(prior);
+    }
+  }
+
+  if (failures.length > 0) {
+    await updateCloudPost(cleanId, {
+      status: "partial",
+      facebook_results: updatedResults,
+      last_error:
+        "Scheduled post deletion was only partially applied: " +
+        failures.join(" | "),
+    });
+
+    throw new Error(
+      "Scheduled post deletion was only partially applied: " +
+        failures.join(" | "),
+    );
+  }
+
+  await removeCloudImages(post.image_paths || []);
+
+  return updateCloudPost(cleanId, {
+    status: "cancelled",
+    facebook_results: updatedResults,
+    facebook_post_ids: null,
+    image_paths: [],
+    next_attempt_at: null,
+    worker_id: null,
+    claimed_at: null,
+    last_error: null,
+  });
+}
+
 export async function cancelAllPreparedCloudPosts() {
   const supabase = getSupabase();
 
