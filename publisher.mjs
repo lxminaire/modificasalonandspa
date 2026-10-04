@@ -9,6 +9,8 @@ import {
 } from "./src/cloudQueue.mjs";
 import {
   approveSocialCampaign,
+  deleteScheduledSocialCampaign,
+  editScheduledSocialCampaign,
   isSocialReviewConfigured,
   listSocialCampaigns,
   retrySocialCampaignAi,
@@ -188,6 +190,42 @@ app.post(
         req.params.campaignId,
         String(req.headers.authorization || ""),
       );
+      res.json(result);
+    } catch (error) {
+      apiError(res, error);
+    }
+  },
+);
+
+app.patch(
+  "/api/social/campaigns/:campaignId/scheduled",
+  requireOwner,
+  async (req, res) => {
+    try {
+      const result = await editScheduledSocialCampaign(
+        req.params.campaignId,
+        {
+          caption: req.body?.caption,
+          publishAt: req.body?.publishAt,
+        },
+      );
+
+      res.json(result);
+    } catch (error) {
+      apiError(res, error);
+    }
+  },
+);
+
+app.delete(
+  "/api/social/campaigns/:campaignId/scheduled",
+  requireOwner,
+  async (req, res) => {
+    try {
+      const result = await deleteScheduledSocialCampaign(
+        req.params.campaignId,
+      );
+
       res.json(result);
     } catch (error) {
       apiError(res, error);
