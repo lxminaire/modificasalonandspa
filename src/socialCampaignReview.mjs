@@ -1,5 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
+import {
+  cancelManagedCloudPost,
+  editManagedCloudPost,
+} from "./cloudQueue.mjs";
 
 const WEBSITE_URL = "https://kqumdpovvxnspnkzzvae.supabase.co";
 const WEBSITE_PUBLISHABLE_KEY =
@@ -288,6 +292,110 @@ export async function updateSocialCampaign(campaignId, updates = {}) {
   }
 
   return data;
+}
+
+export async function editScheduledSocialCampaign(
+  campaignId,
+  updates = {},
+) {
+  const social = getSocialClient();
+
+  const { data: campaign, error: campaignError } = await social
+    .from("social_campaigns")
+    .select("*")
+    .eq("id", campaignId)
+    .maybeSingle();
+
+  if (campaignError) throw new Error(campaignError.message);
+  if (!campaign) throw new Error("Campaign not found.");
+  if (!campaign.cloud_post_id) {
+    throw new Error("This campaign has not been queued yet.");
+  }
+
+  const caption =
+    clean(updates.caption) ||
+    clean(campaign.edited_caption) ||
+    clean(campaign.generated_caption) ||
+    clean(campaign.caption_draft);
+
+  if (!caption) {
+    throw new Error("Caption cannot be empty.");
+  }
+
+  const publishAt = new Date(
+    clean(updates.publishAt) ||
+      clean(campaign.requested_publish_at),
+  );
+
+  if (Number.isNaN(publishAt.getTime())) {
+    throw new Error("A valid scheduled publish time is required.");
+  }
+
+  const cloudPost = await editManagedCloudPost({
+    id: campaign.cloud_post_id,
+    caption,
+    publishAt: publishAt.toISOString(),
+  });
+
+  const now = new Date().toISOString();
+  const { data: updated, error: updateError } = await social
+    .from("social_campaigns")
+    .update({
+      edited_caption: caption,
+      requested_publish_at: cloudPost.publish_at,
+      status: "queued",
+      last_error: null,
+      updated_at: now,
+    })
+    .eq("id", campaign.id)
+    .select("*")
+    .single();
+
+  if (updateError) throw new Error(updateError.message);
+
+  return {
+    campaign: updated,
+    cloudPost,
+  };
+}
+
+export async function deleteScheduledSocialCampaign(campaignId) {
+  const social = getSocialClient();
+
+  const { data: campaign, error: campaignError } = await social
+    .from("social_campaigns")
+    .select("*")
+    .eq("id", campaignId)
+    .maybeSingle();
+
+  if (campaignError) throw new Error(campaignError.message);
+  if (!campaign) throw new Error("Campaign not found.");
+  if (!campaign.cloud_post_id) {
+    throw new Error("This campaign has not been queued yet.");
+  }
+
+  const cloudPost = await cancelManagedCloudPost(
+    campaign.cloud_post_id,
+  );
+
+  const now = new Date().toISOString();
+  const { data: updated, error: updateError } = await social
+    .from("social_campaigns")
+    .update({
+      status: "cancelled",
+      last_error: null,
+      updated_at: now,
+    })
+    .eq("id", campaign.id)
+    .select("*")
+    .single();
+
+  if (updateError) throw new Error(updateError.message);
+
+  return {
+    campaign: updated,
+    cloudPost,
+  };
 }
 
 export async function retrySocialCampaignAi(campaignId, authorization) {
